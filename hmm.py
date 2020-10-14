@@ -16,6 +16,18 @@ def convert_to_16bit(path):
         data, samplerate = soundfile.read(filepath)
         soundfile.write(filepath, data, samplerate, subtype='PCM_16')
 
+def evaluate(hmm_models, filepath):
+    sampling_freq, audio = wavfile.read(filepath)
+    mfcc_features = mfcc(audio, sampling_freq, nfft=2048)
+    output_label = None
+    max_score = -9999999999999999999
+    for item in hmm_models:
+       hmm_model, label = item
+       score = hmm_model.get_score(mfcc_features)
+       if score > max_score:
+          max_score = score
+          output_label = label
+    return output_label
 
 class HMMTrainer(object):
   def __init__(self, model_name='GaussianHMM', n_components=4, cov_type='diag', n_iter=1000):
@@ -24,6 +36,7 @@ class HMMTrainer(object):
     self.cov_type = cov_type
     self.n_iter = n_iter
     self.models = []
+    self.labels = []
     if self.model_name == 'GaussianHMM':
       self.model = hmm.GaussianHMM(n_components=self.n_components, covariance_type=self.cov_type,n_iter=self.n_iter)
     else:
@@ -70,6 +83,7 @@ for dirname in os.listdir(input_folder):
     print('Beginning training')
     hmm_trainer = HMMTrainer(n_components=2)
     hmm_trainer.train(X)
+    hmm_trainer.labels.append(label)
     hmm_models.append((hmm_trainer, label))
     hmm_trainer = None
     print("Training finished")
@@ -110,3 +124,4 @@ cm = confusion_matrix(real_labels, pred_labels)
 print(cm)
 print("Accuracy: ", (cm[0,0]+cm[1,1])/len(real_labels))
 
+print(evaluate(hmm_models, 'testing/no_cough/152912__fmaudio__female-short-laugh-02.wav'))
