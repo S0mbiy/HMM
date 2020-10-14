@@ -1,14 +1,10 @@
 import soundfile
-from python_speech_features import mfcc, logfbank
+from python_speech_features import mfcc
 from scipy.io import wavfile
 import numpy as np
-import matplotlib.pyplot as plt
 from hmmlearn import hmm
 from sklearn.metrics import confusion_matrix
-import itertools
 import os
-import glob
-import os.path as path
 
 def convert_to_16bit(path):
     for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')]:
@@ -36,15 +32,14 @@ class HMMTrainer(object):
     self.cov_type = cov_type
     self.n_iter = n_iter
     self.models = []
-    self.labels = []
     if self.model_name == 'GaussianHMM':
       self.model = hmm.GaussianHMM(n_components=self.n_components, covariance_type=self.cov_type,n_iter=self.n_iter)
     else:
       raise TypeError('Invalid model type') 
 
-  def train(self, X):
+  def train(self, X, lengths):
     np.seterr(all='ignore')
-    self.models.append(self.model.fit(X))
+    self.models.append(self.model.fit(X, lengths))
     # Run the model on input data
   def get_score(self, input_data):
     return self.model.score(input_data)
@@ -65,6 +60,7 @@ for dirname in os.listdir(input_folder):
     label = subfolder[subfolder.rfind('/') + 1:]
     # Initialize variables
     X = np.array([])
+    lengths = []
     # Iterate through the audio files (leaving 1 file for testing in each class)
     for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')]:
         # Read the input file
@@ -77,13 +73,13 @@ for dirname in os.listdir(input_folder):
             X = mfcc_features
         else:
             X = np.append(X, mfcc_features, axis=0)
+        lengths.append(len(mfcc_features))
 
     print('X.shape =', X.shape)
     # Train and save HMM model
     print('Beginning training')
     hmm_trainer = HMMTrainer(n_components=2)
-    hmm_trainer.train(X)
-    hmm_trainer.labels.append(label)
+    hmm_trainer.train(X, lengths)
     hmm_models.append((hmm_trainer, label))
     hmm_trainer = None
     print("Training finished")
@@ -109,6 +105,7 @@ for dirname in os.listdir(input_folder):
     mfcc_features = mfcc(audio, sampling_freq, nfft=2048)
     max_score = -9999999999999999999
     output_label = None
+
     for item in hmm_models:
        hmm_model, label = item
        score = hmm_model.get_score(mfcc_features)
@@ -124,4 +121,4 @@ cm = confusion_matrix(real_labels, pred_labels)
 print(cm)
 print("Accuracy: ", (cm[0,0]+cm[1,1])/len(real_labels))
 
-print(evaluate(hmm_models, 'testing/no_cough/152912__fmaudio__female-short-laugh-02.wav'))
+print(evaluate(hmm_models, "C:/Users/alvar/Downloads/audio.wav"))
