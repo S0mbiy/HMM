@@ -1,3 +1,4 @@
+import soundfile
 from python_speech_features import mfcc, logfbank
 from scipy.io import wavfile
 import numpy as np
@@ -8,6 +9,13 @@ import itertools
 import os
 import glob
 import os.path as path
+
+def convert_to_16bit(path):
+    for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')]:
+        filepath = os.path.join(subfolder, filename)
+        data, samplerate = soundfile.read(filepath)
+        soundfile.write(filepath, data, samplerate, subtype='PCM_16')
+
 
 class HMMTrainer(object):
   def __init__(self, model_name='GaussianHMM', n_components=4, cov_type='diag', n_iter=1000):
@@ -39,22 +47,23 @@ for dirname in os.listdir(input_folder):
     if not os.path.isdir(subfolder):
         print("Subfolder doesn't exist: ", subfolder)
         continue
+    convert_to_16bit(subfolder)
     # Extract the label
     label = subfolder[subfolder.rfind('/') + 1:]
     # Initialize variables
     X = np.array([])
     # Iterate through the audio files (leaving 1 file for testing in each class)
-    for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')][:-1]:
-            # Read the input file
-            filepath = os.path.join(subfolder, filename)
-            sampling_freq, audio = wavfile.read(filepath)
-            # Extract MFCC features
-            mfcc_features = mfcc(audio, sampling_freq)
-            # Append to the variable X
-            if len(X) == 0:
-                X = mfcc_features
-            else:
-                X = np.append(X, mfcc_features, axis=0)
+    for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')]:
+        # Read the input file
+        filepath = os.path.join(subfolder, filename)
+        sampling_freq, audio = wavfile.read(filepath)
+        # Extract MFCC features
+        mfcc_features = mfcc(audio, sampling_freq, nfft=2048)
+        # Append to the variable X
+        if len(X) == 0:
+            X = mfcc_features
+        else:
+            X = np.append(X, mfcc_features, axis=0)
 
     print('X.shape =', X.shape)
     # Train and save HMM model
@@ -71,15 +80,19 @@ pred_labels = []
 for dirname in os.listdir(input_folder):
   subfolder = os.path.join(input_folder, dirname)
   if not os.path.isdir(subfolder):
+    print("Subfolder doesn't exist: ", subfolder)
     continue
+
+  convert_to_16bit(subfolder)
+
   # Extract the label
   label_real = subfolder[subfolder.rfind('/') + 1:]
 
-  for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')][:-1]:
+  for filename in [x for x in os.listdir(subfolder) if x.endswith('.wav')]:
     real_labels.append(label_real)
     filepath = os.path.join(subfolder, filename)
     sampling_freq, audio = wavfile.read(filepath)
-    mfcc_features = mfcc(audio, sampling_freq)
+    mfcc_features = mfcc(audio, sampling_freq, nfft=2048)
     max_score = -9999999999999999999
     output_label = None
     for item in hmm_models:
